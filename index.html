@@ -1,42 +1,144 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fly Squasher</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Fly Splat!</title>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-            user-select: none;
-            touch-action: none;
-        }
-        #root {
-            width: 100%;
-            height: 100%;
-        }
-        canvas {
-            display: block;
-            touch-action: none;
-        }
+        body { margin: 0; overflow: hidden; background: #FFD700; font-family: sans-serif; touch-action: none; }
+        #timer { position: absolute; top: 20px; width: 100%; text-align: center; font-size: 48px; font-weight: bold; color: #333; pointer-events: none; }
+        #level { position: absolute; top: 80px; width: 100%; text-align: center; font-size: 24px; color: #333; pointer-events: none; }
+        .fly { position: absolute; width: 40px; height: 40px; background: black; border-radius: 50%; cursor: none; }
+        .fly::after { content: ''; position: absolute; width: 8px; height: 8px; background: red; border-radius: 50%; top: 5px; right: 5px; box-shadow: -22px 0 red; }
+        .splat { position: absolute; width: 60px; height: 60px; background: rgba(85, 107, 47, 0.8); border-radius: 40% 60% 50% 50%; pointer-events: none; transform: rotate(45deg); z-index: 0; }
+        #swatter { position: absolute; width: 80px; height: 80px; border: 4px solid #333; background: rgba(0,0,0,0.1); pointer-events: none; transform: translate(-50%, -50%); z-index: 100; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); }
+        #swatter div { border: 0.5px solid rgba(0,0,0,0.2); }
+        #ui { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; display: none; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 1000; }
+        button { background: #ff4757; color: white; border: none; padding: 15px 30px; font-size: 24px; border-radius: 10px; cursor: pointer; margin-top: 20px; }
     </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
-  }
-}
-</script>
 </head>
-<body>
-    <div id="root"></div>
+<body onclick="slam()">
+    <div id="timer">10s</div>
+    <div id="level">Level 1</div>
+    <div id="swatter"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+    
+    <div id="ui">
+        <h1 id="msg">LEVEL CLEAR</h1>
+        <button onclick="restart()">Kill Again</button>
+    </div>
+
+    <script>
+        let level = 1;
+        let timeLeft = 10;
+        let flies = [];
+        let gameActive = true;
+        const swatter = document.getElementById('swatter');
+        const timerEl = document.getElementById('timer');
+
+        const levels = [
+            { count: 1, speed: 2, random: false, time: 10 },
+            { count: 2, speed: 2, random: false, time: 10 },
+            { count: 3, speed: 2, random: true, time: 10 },
+            { count: 3, speed: 4, random: true, time: 10 },
+            { count: 5, speed: 5, random: true, time: 20 }
+        ];
+
+        document.addEventListener('mousemove', (e) => {
+            swatter.style.left = e.clientX + 'px';
+            swatter.style.top = e.clientY + 'px';
+        });
+
+        function spawnFlies() {
+            const config = levels[level-1];
+            timeLeft = config.time;
+            for(let i=0; i<config.count; i++) {
+                let f = document.createElement('div');
+                f.className = 'fly';
+                f.style.left = Math.random() * (window.innerWidth - 40) + 'px';
+                f.style.top = Math.random() * (window.innerHeight - 40) + 'px';
+                let flyObj = {
+                    el: f,
+                    x: Math.random() * window.innerWidth,
+                    y: Math.random() * window.innerHeight,
+                    vx: (Math.random() - 0.5) * config.speed,
+                    vy: (Math.random() - 0.5) * config.speed
+                };
+                document.body.appendChild(f);
+                flies.push(flyObj);
+            }
+        }
+
+        function update() {
+            if(!gameActive) return;
+            const config = levels[level-1];
+            flies.forEach(f => {
+                f.x += f.vx;
+                f.y += f.vy;
+                if(f.x < 0 || f.x > window.innerWidth - 40) f.vx *= -1;
+                if(f.y < 0 || f.y > window.innerHeight - 40) f.vy *= -1;
+                if(config.random && Math.random() < 0.02) {
+                    f.vx = (Math.random() - 0.5) * config.speed;
+                    f.vy = (Math.random() - 0.5) * config.speed;
+                }
+                f.el.style.left = f.x + 'px';
+                f.el.style.top = f.y + 'px';
+            });
+        }
+
+        function slam() {
+            if(!gameActive) return;
+            document.body.style.transform = "scale(0.98)";
+            setTimeout(() => document.body.style.transform = "scale(1)", 50);
+            
+            const rect = swatter.getBoundingClientRect();
+            flies.forEach((f, index) => {
+                if(f.x > rect.left && f.x < rect.right && f.y > rect.top && f.y < rect.bottom) {
+                    createSplat(f.x, f.y);
+                    f.el.remove();
+                    flies.splice(index, 1);
+                }
+            });
+
+            if(flies.length === 0) win();
+        }
+
+        function createSplat(x, y) {
+            let s = document.createElement('div');
+            s.className = 'splat';
+            s.style.left = x + 'px';
+            s.style.top = y + 'px';
+            document.body.appendChild(s);
+        }
+
+        function win() {
+            if(level === 5) {
+                endGame("YOU KILLED THEM ALL!");
+            } else {
+                level++;
+                document.getElementById('level').innerText = "Level " + level;
+                spawnFlies();
+            }
+        }
+
+        function endGame(m) {
+            gameActive = false;
+            document.getElementById('ui').style.display = 'block';
+            document.getElementById('msg').innerText = m;
+        }
+
+        function restart() {
+            location.reload();
+        }
+
+        setInterval(() => {
+            if(!gameActive) return;
+            timeLeft--;
+            timerEl.innerText = timeLeft + "s";
+            if(timeLeft <= 0) endGame("GAME OVER");
+        }, 1000);
+
+        setInterval(update, 1000/60);
+        spawnFlies();
+    </script>
 </body>
 </html>
